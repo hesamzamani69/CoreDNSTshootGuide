@@ -1,1 +1,101 @@
+Complete Guide to Troubleshooting CoreDNS in Kubernetes
+
+
+Checking the Status of CoreDNS Pods
+  kubectl get pods -n kube-system -l k8s-app=kube-dns
+Look for Pods that are in the Running state and ensure there are no errors or CrashLoopBackOff status.
+
+Checking CoreDNS Logs
+To get more details about CoreDNS issues, check the logs:
+  kubectl logs -n kube-system -l k8s-app=kube-dns
+Look for specific errors and warnings that can provide more insight into the issue.
+
+
+Checking the CoreDNS ConfigMap
+Ensure the CoreDNS settings in the ConfigMap are correct. To do this, get and review the ConfigMap:
+  kubectl get configmap coredns -n kube-system -o yaml
+
+The relevant section of the output should look like this:
+
+  apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health
+        ready
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+            pods insecure
+            fallthrough in-addr.arpa ip6.arpa
+        }
+        prometheus :9153
+        forward . 8.8.8.8
+        cache 30
+        loop
+        reload
+        loadbalance
+    }
+
+
+Testing Connectivity to Upstream DNS Servers
+Ensure that CoreDNS can communicate with upstream DNS servers. You can do this from inside one of the CoreDNS Pods:  
+  kubectl exec -n kube-system -it <coredns-pod-name> -- sh
+  nslookup google.com
+If this command does not execute correctly, there may be an issue with the upstream DNS server connectivity. 
+
+
+Checking Network Policies
+If you are using Network Policies, ensure that the policies allow the necessary access for CoreDNS.
+  kubectl get networkpolicy -A
+Ensure that DNS traffic (port 53) is not blocked.
+
+Checking CoreDNS Services and Endpoints
+Ensure that the CoreDNS services and endpoints are correctly configured:
+  kubectl get svc -n kube-system
+  kubectl get endpoints -n kube-system
+Ensure that the kube-dns service is correctly configured and the related endpoints are in the Ready state.
+
+
+Checking Kubelet Settings
+Review the kubelet settings to ensure they are correctly configured and that CoreDNS can properly communicate with them.
+  ps aux | grep kubelet
+Look for settings that could affect DNS performance, such as --resolv-conf. Ensure these settings are correctly configured.
+
+Checking resolv.conf in Pods
+Ensure that the resolv.conf file in the Pods is correctly configured:
+  kubectl exec -it <pod-name> -- cat /etc/resolv.conf
+
+cehcking Probes in CoreDNS.
+as we know there are different probes in Kubernetes including readiness and liveness that investigate the health of the service. make sure these probes work properly
+  kubectl describe deployment coredns -n kube-system
+
+Rollout and Restart CoreDNS Deployment
+  kubectl rollout restart deployment/coredns -n kube-system
+  kubectl get pods -n kube-system -l k8s-app=kube-dns
+
+Test DNS NAme Resolution Within PODs
+  kubectl run -i --tty --rm debug --image=busybox --restart=Never -- sh
+# within Pod
+nslookup kubernetes.default.svc.cluster.local
+
+
+Check System Resources
+  kubectl top pods -n kube-system
+
+
+
+
+
+
+  
+
+
+
+
+
+  
 
